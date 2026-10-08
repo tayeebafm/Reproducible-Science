@@ -1,0 +1,145 @@
+---
+title: "Reproducible science_Linear model"
+author: "Tayeeba Ferdous Mahi"
+date: "08/10/26"
+output:
+  html_document: null
+  df_print: paged
+  html_notebook: default
+  pdf_document: default
+  word_document: default
+---
+
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+#First need to run the library
+```{r}
+
+library(performance)
+library(tidyverse)
+
+```
+
+
+
+#To read the dataset 
+```{r}
+df_Park<-read_csv("Parketal2001WBK-2.csv")
+```
+
+#To check the quality control
+A histogram of Airspeed shows the range of values and whether anything looks strange, such as impossible values or gaps.
+```{r}
+
+
+df_Park%>% ggplot(aes(x = Airspeed)) +
+  geom_histogram()
+
+```
+
+#Plot Airspeed vs Wingbeat amplitude (Bird 1)
+```{r}
+df_Park%>%
+  filter(Bird_ID==1)%>%
+  ggplot(aes(x=Airspeed,y=Wingbeat_Amp))+
+  geom_point()+
+  theme_bw() + ## this part is added to get the line 
+stat_smooth(method="lm")
+```
+
+#To fit the model making dataset of a bird 1 
+```{r}
+
+df_Park%>%
+  filter(Bird_ID==1)%>%
+  ggplot(aes(x=Airspeed,y=Wingbeat_Amp))+
+  geom_point()+
+  xlim(0, 14)+
+  ylim(40,130)+
+  theme_bw()
+```
+
+
+#Filtering data with bird id 1
+
+```{r}
+df_bird1 <- df_Park %>%
+  filter(Bird_ID == 1)
+
+lm_wba_1 <- lm(Wingbeat_Amp ~ Airspeed,
+               data = df_bird1)
+
+
+```
+
+#To check the assumption: check_model(lm_wba_1)  ## to see the model if the 4 plot is good. check_model() shows diagnostic plots for linearity, equal variance, normality of residuals and influential points. The histogram of residuals should look roughly bell-shaped.
+```{r}
+check_model(lm_wba_1) 
+hist(lm_wba_1$residuals)
+```
+
+#To read the results: summary() gives the intercept, the slope (the change in amplitude per 1 m/s of airspeed), p-values and R². confint() gives the 95% confidence intervals for the intercept and slope. summary.aov() gives the ANOVA table (F-test). For a one-predictor model, its p-value matches the slope's p-value.
+
+```{r}
+summary(lm_wba_1)
+
+
+confint(lm_wba_1)
+
+summary.aov(lm_wba_1)
+
+```
+
+#Check the effect of the first data point: [-1, ] removes row 1.
+
+
+```{r}
+lm_wba_2 <- update(lm_wba_1, data = df_bird1[-1, ])
+summary(lm_wba_1)
+summary(lm_wba_2)
+```
+
+#Make predictions for a smooth line: seq() creates 100 evenly spaced Airspeed values from the minimum to the maximum.predict(..., int = "c") gives the predicted value (fit) and the confidence interval (lwr, upr) for each of those values.bind_cols() puts the airspeeds and predictions side by side in one table.
+
+```{r}
+df_newbird <- 
+  tibble(Airspeed = seq(min(df_bird1$Airspeed), # the minimum of the range
+                        max(df_bird1$Airspeed), # the maximum of the range
+                        length = 100)) # this tells R how many values to generate
+
+
+df_preds <- predict(lm_wba_1,
+                    newdata = df_newbird,
+                    int = "c")
+
+df_newbird_preds <- bind_cols(df_newbird, as_tibble(df_preds))
+```
+
+
+#Final plot
+
+```{r}
+ggplot(df_newbird_preds,
+       aes(x = Airspeed, y = fit)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = lwr,
+                  ymax = upr),
+              alpha = 0.25) + # this argument makes the CI transparent
+  labs(x = "Airspeed (m/s)",
+       y = expression("Wingbeat Amplitude(degrees C)")) + 
+  geom_point(data = df_bird1,aes(y=Wingbeat_Amp),## to get the line and points together we used this code along with the previous code. we can get any help from the 
+             colour = "blue")+
+  geom_line(colour = ("red")) +
+  theme_bw()
+```
+
+
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
